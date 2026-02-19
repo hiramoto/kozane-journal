@@ -254,6 +254,78 @@
     color: var(--text-normal);
 }
 
+/* --- Review & Stale Tasks Section --- */
+.kozane-review-section {
+    margin-bottom: 12px;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+}
+
+.kozane-review-group {
+    margin-top: 6px;
+}
+
+.kozane-review-group-label {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.kozane-review-task-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    margin: 2px 0;
+    border-radius: 4px;
+    background: var(--background-primary);
+}
+
+.kozane-review-task-name {
+    font-size: 0.85em;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.kozane-review-task-name:hover {
+    color: var(--interactive-accent);
+    text-decoration: underline;
+}
+
+.kozane-review-badge {
+    font-size: 0.7em;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.kozane-review-badge.is-today {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.kozane-review-badge.is-upcoming {
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+.kozane-review-badge.is-stale {
+    background: var(--text-faint);
+    color: var(--background-primary);
+}
+
 /* --- Unplanned Tasks Label --- */
 .kozane-unplanned-label {
     font-size: 0.85em;
