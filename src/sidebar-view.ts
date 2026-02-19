@@ -1,4 +1,4 @@
-import { App, ItemView, WorkspaceLeaf } from "obsidian";
+import { App, ItemView, TFile, WorkspaceLeaf } from "obsidian";
 import {
     PluginSettings,
     TaskSummary,
@@ -18,6 +18,19 @@ import {
     parseTimeToMinutes,
     getWorkLogsForDateRange,
 } from "./parser";
+
+interface ReviewTaskInfo {
+    file: TFile;
+    reviewDate: string;
+    daysUntil: number;
+    status: string;
+}
+
+interface StaleTaskInfo {
+    file: TFile;
+    daysSinceUpdate: number;
+    status: string;
+}
 
 export class DailySummaryView extends ItemView {
     private settings: PluginSettings;
@@ -220,6 +233,9 @@ export class DailySummaryView extends ItemView {
 
         // Upcoming tasks section
         this.renderUpcomingTasks(container, timeSlots);
+
+        // Review & stale tasks section
+        this.renderReviewSection(container);
 
         // Progress section
         const progressSection = container.createDiv({ cls: "kozane-progress" });
@@ -523,6 +539,162 @@ export class DailySummaryView extends ItemView {
                 slotDiv.createEl("div", {
                     text: `・${entry.taskName}${entry.subTask ? " / " + entry.subTask : ""} ${formatDuration(entry.plannedMinutes)}`,
                     cls: "kozane-upcoming-task",
+                });
+            }
+        }
+    }
+
+    private getReviewTasks(): ReviewTaskInfo[] {
+        const today = window.moment().startOf("day");
+        const threshold = today.clone().add(3, "days");
+        const tasksFolder = this.settings.tasksFolder;
+        const allFiles = this.app.vault.getFiles();
+        const taskFiles = allFiles.filter(
+            (f) => f.path.startsWith(tasksFolder + "/") && f.extension === "md"
+        );
+
+        const results: ReviewTaskInfo[] = [];
+
+        for (const file of taskFiles) {
+            const cache = this.app.metadataCache.getFileCache(file);
+            const fm = cache?.frontmatter;
+            if (!fm) continue;
+
+            const status = fm.status as string | undefined;
+            if (status !== "in-progress" && status !== "not-started") continue;
+
+            const reviewDateStr = fm.review_date as string | undefined;
+            if (!reviewDateStr) continue;
+
+            const reviewDate = window.moment(reviewDateStr, "YYYY-MM-DD");
+            if (!reviewDate.isValid()) continue;
+
+            if (reviewDate.isSameOrAfter(today) && reviewDate.isSameOrBefore(threshold)) {
+                results.push({
+                    file,
+                    reviewDate: reviewDateStr,
+                    daysUntil: reviewDate.diff(today, "days"),
+                    status: status || "not-started",
+                });
+            }
+        }
+
+        // Sort by review date ascending (soonest first)
+        results.sort((a, b) => a.daysUntil - b.daysUntil);
+        return results;
+    }
+
+    private getStaleTasks(excludeNames: Set<string>): StaleTaskInfo[] {
+        const now = Date.now();
+        const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+        const tasksFolder = this.settings.tasksFolder;
+        const allFiles = this.app.vault.getFiles();
+        const taskFiles = allFiles.filter(
+            (f) => f.path.startsWith(tasksFolder + "/") && f.extension === "md"
+        );
+
+        const candidates: StaleTaskInfo[] = [];
+
+        for (const file of taskFiles) {
+            if (excludeNames.has(file.basename)) continue;
+
+            const cache = this.app.metadataCache.getFileCache(file);
+            const fm = cache?.frontmatter;
+            if (!fm) continue;
+
+            const status = fm.status as string | undefined;
+            if (status !== "in-progress" && status !== "not-started") continue;
+
+            const mtime = file.stat.mtime;
+            const elapsed = now - mtime;
+            if (elapsed >= oneWeekMs) {
+                candidates.push({
+                    file,
+                    daysSinceUpdate: Math.floor(elapsed / (24 * 60 * 60 * 1000)),
+                    status: status || "not-started",
+                });
+            }
+        }
+
+        // Shuffle and pick up to 2
+        for (let i = candidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        }
+
+        return candidates.slice(0, 2);
+    }
+
+    private renderReviewSection(container: HTMLElement): void {
+        const reviewTasks = this.getReviewTasks();
+        const staleTasks = this.getStaleTasks(
+            new Set(reviewTasks.map((t) => t.file.basename))
+        );
+
+        if (reviewTasks.length === 0 && staleTasks.length === 0) {
+            return;
+        }
+
+        const section = container.createDiv({ cls: "kozane-review-section" });
+        section.createEl("h3", { text: "【振り返り・気になるタスク】" });
+
+        if (reviewTasks.length > 0) {
+            const reviewDiv = section.createDiv({ cls: "kozane-review-group" });
+            reviewDiv.createEl("div", {
+                text: "振り返り予定",
+                cls: "kozane-review-group-label",
+            });
+
+            for (const task of reviewTasks) {
+                const taskDiv = reviewDiv.createDiv({ cls: "kozane-review-task-item" });
+
+                const nameEl = taskDiv.createEl("a", {
+                    text: task.file.basename,
+                    cls: "kozane-review-task-name",
+                });
+                nameEl.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    this.app.workspace.openLinkText(task.file.path, "", false);
+                });
+
+                let label: string;
+                if (task.daysUntil === 0) {
+                    label = "今日";
+                } else if (task.daysUntil === 1) {
+                    label = "明日";
+                } else {
+                    label = `${task.daysUntil}日後`;
+                }
+
+                const badgeCls = task.daysUntil === 0
+                    ? "kozane-review-badge is-today"
+                    : "kozane-review-badge is-upcoming";
+                taskDiv.createEl("span", { text: label, cls: badgeCls });
+            }
+        }
+
+        if (staleTasks.length > 0) {
+            const staleDiv = section.createDiv({ cls: "kozane-review-group" });
+            staleDiv.createEl("div", {
+                text: "しばらく更新なし",
+                cls: "kozane-review-group-label",
+            });
+
+            for (const task of staleTasks) {
+                const taskDiv = staleDiv.createDiv({ cls: "kozane-review-task-item" });
+
+                const nameEl = taskDiv.createEl("a", {
+                    text: task.file.basename,
+                    cls: "kozane-review-task-name",
+                });
+                nameEl.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    this.app.workspace.openLinkText(task.file.path, "", false);
+                });
+
+                taskDiv.createEl("span", {
+                    text: `${task.daysSinceUpdate}日前`,
+                    cls: "kozane-review-badge is-stale",
                 });
             }
         }
