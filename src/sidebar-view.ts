@@ -71,7 +71,7 @@ export class DailySummaryView extends ItemView {
     }
 
     async refresh(): Promise<void> {
-        const container = this.containerEl.children[1];
+        const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
 
         const fmt = this.settings.dailyNoteFormat;
@@ -94,13 +94,34 @@ export class DailySummaryView extends ItemView {
             });
         }
 
-        const content = container.createDiv({ cls: "kozane-sidebar-content" });
+        // Scrollable wrapper with overflow indicator
+        const scrollWrapper = container.createDiv({ cls: "kozane-scroll-wrapper" });
+        const content = scrollWrapper.createDiv({ cls: "kozane-sidebar-content" });
 
         if (this.currentTab === "date-select") {
             await this.renderDateSelectTab(content);
         } else {
             await this.renderPeriodSelectTab(content);
         }
+
+        // Set up scroll indicator
+        this.setupScrollIndicator(scrollWrapper);
+    }
+
+    private setupScrollIndicator(scrollWrapper: HTMLElement): void {
+        const updateIndicator = () => {
+            const hasOverflow = scrollWrapper.scrollHeight > scrollWrapper.clientHeight;
+            const isAtBottom = scrollWrapper.scrollHeight - scrollWrapper.scrollTop - scrollWrapper.clientHeight < 2;
+            if (hasOverflow && !isAtBottom) {
+                scrollWrapper.classList.add("has-overflow-below");
+            } else {
+                scrollWrapper.classList.remove("has-overflow-below");
+            }
+        };
+
+        scrollWrapper.addEventListener("scroll", updateIndicator);
+        // Check on initial render (use requestAnimationFrame to ensure layout is complete)
+        requestAnimationFrame(updateIndicator);
     }
 
     private async renderDateSelectTab(container: HTMLElement): Promise<void> {
@@ -234,9 +255,6 @@ export class DailySummaryView extends ItemView {
         // Upcoming tasks section
         this.renderUpcomingTasks(container, timeSlots);
 
-        // Review & stale tasks section
-        this.renderReviewSection(container);
-
         // Progress section
         const progressSection = container.createDiv({ cls: "kozane-progress" });
         progressSection.createEl("h3", { text: "【今日の作業時間】" });
@@ -274,6 +292,9 @@ export class DailySummaryView extends ItemView {
 
         // Task planned vs actual summary
         this.renderTaskPlannedVsActual(container, planEntries, logEntries);
+
+        // Review & stale tasks section (at the bottom)
+        this.renderReviewSection(container);
     }
 
     private async renderSingleDateSummary(container: HTMLElement, date: string): Promise<void> {

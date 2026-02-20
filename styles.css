@@ -74,6 +74,35 @@
     border-color: var(--interactive-accent);
 }
 
+/* --- Scroll Wrapper with overflow indicator --- */
+.view-content:has(.kozane-scroll-wrapper) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.kozane-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    position: relative;
+}
+
+.kozane-scroll-wrapper.has-overflow-below::after {
+    content: "▼ 下にスクロール";
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 4px 0;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    background: linear-gradient(transparent, var(--background-primary) 40%);
+    pointer-events: none;
+}
+
 .kozane-sidebar-content {
     padding: 12px;
 }
