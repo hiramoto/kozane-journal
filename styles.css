@@ -340,6 +340,11 @@
     flex-shrink: 0;
 }
 
+.kozane-review-badge.is-overdue {
+    background: var(--text-error);
+    color: var(--text-on-accent);
+}
+
 .kozane-review-badge.is-today {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
