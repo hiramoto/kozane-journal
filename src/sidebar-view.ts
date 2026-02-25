@@ -590,7 +590,7 @@ export class DailySummaryView extends ItemView {
             const reviewDate = window.moment(reviewDateStr, "YYYY-MM-DD");
             if (!reviewDate.isValid()) continue;
 
-            if (reviewDate.isSameOrAfter(today) && reviewDate.isSameOrBefore(threshold)) {
+            if (reviewDate.isSameOrBefore(threshold)) {
                 results.push({
                     file,
                     reviewDate: reviewDateStr,
@@ -679,17 +679,20 @@ export class DailySummaryView extends ItemView {
                 });
 
                 let label: string;
-                if (task.daysUntil === 0) {
+                let badgeCls: string;
+                if (task.daysUntil < 0) {
+                    label = `${Math.abs(task.daysUntil)}日超過`;
+                    badgeCls = "kozane-review-badge is-overdue";
+                } else if (task.daysUntil === 0) {
                     label = "今日";
+                    badgeCls = "kozane-review-badge is-today";
                 } else if (task.daysUntil === 1) {
                     label = "明日";
+                    badgeCls = "kozane-review-badge is-upcoming";
                 } else {
                     label = `${task.daysUntil}日後`;
+                    badgeCls = "kozane-review-badge is-upcoming";
                 }
-
-                const badgeCls = task.daysUntil === 0
-                    ? "kozane-review-badge is-today"
-                    : "kozane-review-badge is-upcoming";
                 taskDiv.createEl("span", { text: label, cls: badgeCls });
             }
         }
