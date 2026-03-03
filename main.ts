@@ -90,10 +90,11 @@ export default class KozaneJournalPlugin extends Plugin {
             })
         );
 
-        // --- Refresh on file open ---
+        // --- Refresh on file open (auto-switch sidebar for task files) ---
         this.registerEvent(
-            this.app.workspace.on("file-open", () => {
+            this.app.workspace.on("file-open", (file) => {
                 this.refreshStatusBar();
+                this.updateSidebarForActiveFile(file);
             })
         );
     }
@@ -201,6 +202,22 @@ export default class KozaneJournalPlugin extends Plugin {
             if (view instanceof DailySummaryView) {
                 view.updateSettings(this.settings);
                 view.refresh();
+            }
+        }
+    }
+
+    private updateSidebarForActiveFile(file: TFile | null): void {
+        const isTaskFile = file instanceof TFile
+            && file.path.startsWith(this.settings.tasksFolder + "/")
+            && file.extension === "md";
+
+        const taskName = isTaskFile ? file!.basename : null;
+
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY_SUMMARY);
+        for (const leaf of leaves) {
+            const view = leaf.view;
+            if (view instanceof DailySummaryView) {
+                view.setActiveTask(taskName);
             }
         }
     }
