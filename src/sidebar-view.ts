@@ -11,6 +11,7 @@ import {
     adjustForLunchBreak,
     formatDuration,
     getTodayDailyNote,
+    getTaskWorkLogs,
     minutesToTimeStr,
     parseLogEntries,
     parsePlanEntries,
@@ -35,6 +36,8 @@ interface StaleTaskInfo {
 export class DailySummaryView extends ItemView {
     private settings: PluginSettings;
     private currentTab: SummaryTab = "date-select";
+    private previousTab: SummaryTab = "date-select";
+    private activeTaskName: string | null = null;
     private selectedDate: string;
     private periodStartDate: string;
     private periodEndDate: string;
@@ -66,6 +69,22 @@ export class DailySummaryView extends ItemView {
         this.settings = settings;
     }
 
+    setActiveTask(taskName: string | null): void {
+        if (taskName) {
+            this.activeTaskName = taskName;
+            if (this.currentTab !== "task-history") {
+                this.previousTab = this.currentTab;
+            }
+            this.currentTab = "task-history";
+        } else {
+            this.activeTaskName = null;
+            if (this.currentTab === "task-history") {
+                this.currentTab = this.previousTab;
+            }
+        }
+        this.refresh();
+    }
+
     async onOpen(): Promise<void> {
         await this.refresh();
     }
@@ -76,11 +95,12 @@ export class DailySummaryView extends ItemView {
 
         const fmt = this.settings.dailyNoteFormat;
 
-        // Main tab bar: 日付選択 | 期間選択
+        // Main tab bar: 日付選択 | 期間選択 | タスク履歴
         const tabBar = container.createDiv({ cls: "kozane-tab-bar" });
         const tabs: { id: SummaryTab; label: string }[] = [
             { id: "date-select", label: "日付選択" },
             { id: "period-select", label: "期間選択" },
+            { id: "task-history", label: "タスク履歴" },
         ];
 
         for (const tab of tabs) {
@@ -89,6 +109,9 @@ export class DailySummaryView extends ItemView {
                 cls: `kozane-tab ${this.currentTab === tab.id ? "is-active" : ""}`,
             });
             btn.addEventListener("click", () => {
+                if (tab.id !== "task-history") {
+                    this.previousTab = tab.id;
+                }
                 this.currentTab = tab.id;
                 this.refresh();
             });
@@ -100,8 +123,10 @@ export class DailySummaryView extends ItemView {
 
         if (this.currentTab === "date-select") {
             await this.renderDateSelectTab(content);
-        } else {
+        } else if (this.currentTab === "period-select") {
             await this.renderPeriodSelectTab(content);
+        } else {
+            await this.renderTaskHistoryTab(content);
         }
 
         // Set up scroll indicator
@@ -721,6 +746,72 @@ export class DailySummaryView extends ItemView {
                     cls: "kozane-review-badge is-stale",
                 });
             }
+        }
+    }
+
+    private async renderTaskHistoryTab(container: HTMLElement): Promise<void> {
+        if (!this.activeTaskName) {
+            container.createEl("p", {
+                text: "タスクファイルを開くと作業履歴が表示されます",
+                cls: "kozane-no-data",
+            });
+            return;
+        }
+
+        container.createEl("h3", { text: `【${this.activeTaskName}】` });
+
+        const entries = await getTaskWorkLogs(this.app, this.activeTaskName, this.settings);
+
+        if (entries.length === 0) {
+            container.createEl("p", {
+                text: "作業記録がありません",
+                cls: "kozane-no-data",
+            });
+            return;
+        }
+
+        // Summary stats
+        let totalMinutes = 0;
+        const workDays = new Set<string>();
+        for (const entry of entries) {
+            totalMinutes += entry.durationMinutes;
+            workDays.add(entry.date);
+        }
+
+        const summaryDiv = container.createDiv({ cls: "kozane-progress-info" });
+        this.addInfoRow(summaryDiv, "累計作業時間", formatDuration(totalMinutes));
+        this.addInfoRow(summaryDiv, "作業日数", `${workDays.size}日`);
+        this.addInfoRow(summaryDiv, "セッション数", `${entries.length}回`);
+
+        // History table
+        const table = container.createEl("table", { cls: "kozane-history-table" });
+
+        const thead = table.createEl("thead");
+        const headerRow = thead.createEl("tr");
+        headerRow.createEl("th", { text: "日付" });
+        headerRow.createEl("th", { text: "時刻" });
+        headerRow.createEl("th", { text: "所要時間" });
+        headerRow.createEl("th", { text: "メモ" });
+
+        const tbody = table.createEl("tbody");
+        for (const entry of entries) {
+            const row = tbody.createEl("tr");
+
+            const dateCell = row.createEl("td");
+            const dateLink = dateCell.createEl("a", {
+                text: entry.date,
+                cls: "internal-link",
+                href: entry.date,
+            });
+            dateLink.dataset.href = entry.date;
+            dateLink.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.app.workspace.openLinkText(entry.date, "", false);
+            });
+
+            row.createEl("td", { text: `${entry.startTime}-${entry.endTime}` });
+            row.createEl("td", { text: formatDuration(entry.durationMinutes) });
+            row.createEl("td", { text: entry.note });
         }
     }
 

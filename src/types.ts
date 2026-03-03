@@ -63,6 +63,6 @@ export interface TimeSlot {
 
 export type SummaryPeriod = "today" | "this-week" | "last-week" | "this-month" | "last-month";
 
-export type SummaryTab = "date-select" | "period-select";
+export type SummaryTab = "date-select" | "period-select" | "task-history";
 
 export const VIEW_TYPE_DAILY_SUMMARY = "kozane-journal-daily-summary";

@@ -370,6 +370,16 @@
     border-top: 1px dashed var(--background-modifier-border);
 }
 
+/* --- Task History in Sidebar --- */
+.kozane-sidebar-content .kozane-history-table {
+    font-size: 0.82em;
+}
+
+.kozane-sidebar-content .kozane-history-table th,
+.kozane-sidebar-content .kozane-history-table td {
+    padding: 3px 6px;
+}
+
 /* --- Active Work Timer (Status Bar) --- */
 .kozane-timer-bar {
     display: inline-flex;
