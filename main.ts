@@ -5,7 +5,7 @@ import {
     PluginSettings,
     VIEW_TYPE_DAILY_SUMMARY,
 } from "./src/types";
-import { TaskSelectModal, MemoInputModal, TaskAddModal, getTaskFilesSorted, startWork, endWork, createTaskFile } from "./src/commands";
+import { TaskSelectModal, TaskDetailModal, MemoInputModal, TaskAddModal, getTaskFilesSorted, startWork, endWork, createTaskFile } from "./src/commands";
 import { updateStatusBar, updateTimerBar } from "./src/statusbar";
 import { createHistoryPostProcessor } from "./src/history-view";
 import { DailySummaryView } from "./src/sidebar-view";
@@ -124,11 +124,13 @@ export default class KozaneJournalPlugin extends Plugin {
         }
 
         new TaskSelectModal(this.app, taskFiles, (file) => {
-            const result = startWork(this.app, file, this.activeWork, this.settings);
-            if (!result.warning) {
-                this.activeWork = result.activeWork;
-                this.refreshTimerBar();
-            }
+            new TaskDetailModal(this.app, file.basename, (detail) => {
+                const result = startWork(this.app, file, this.activeWork, this.settings, detail);
+                if (!result.warning) {
+                    this.activeWork = result.activeWork;
+                    this.refreshTimerBar();
+                }
+            }).open();
         }).open();
     }
 

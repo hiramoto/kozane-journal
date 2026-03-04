@@ -45,6 +45,7 @@ export interface ActiveWork {
     taskName: string;
     taskPath: string;
     startTime: Date;
+    detail: string;
 }
 
 export interface TaskSummary {

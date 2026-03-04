@@ -158,6 +158,64 @@ export function resolveDateExpressions(template: string, title: string): string 
 }
 
 /**
+ * Modal for entering task details when starting work.
+ */
+export class TaskDetailModal extends Modal {
+    private onSubmit: (detail: string) => void;
+    private detail: string = "";
+    private taskName: string;
+
+    constructor(app: App, taskName: string, onSubmit: (detail: string) => void) {
+        super(app);
+        this.taskName = taskName;
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen(): void {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: `作業開始: ${this.taskName}` });
+
+        new Setting(contentEl)
+            .setName("作業内容（省略可）")
+            .addText((text) => {
+                text.setPlaceholder("これから行う作業内容を記入...");
+                text.onChange((value) => {
+                    this.detail = value;
+                });
+                text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        this.close();
+                        this.onSubmit(this.detail);
+                    }
+                });
+                setTimeout(() => text.inputEl.focus(), 50);
+            });
+
+        new Setting(contentEl)
+            .addButton((btn) =>
+                btn
+                    .setButtonText("開始する")
+                    .setCta()
+                    .onClick(() => {
+                        this.close();
+                        this.onSubmit(this.detail);
+                    })
+            )
+            .addButton((btn) =>
+                btn.setButtonText("キャンセル").onClick(() => {
+                    this.close();
+                })
+            );
+    }
+
+    onClose(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+/**
  * Modal for adding a new task.
  */
 export class TaskAddModal extends Modal {
@@ -288,7 +346,8 @@ export function startWork(
     app: App,
     taskFile: TFile,
     activeWork: ActiveWork | null,
-    settings: PluginSettings
+    settings: PluginSettings,
+    detail: string = ""
 ): { activeWork: ActiveWork; warning: boolean } {
     let warning = false;
 
@@ -305,6 +364,7 @@ export function startWork(
         taskName: taskFile.basename,
         taskPath: taskFile.path,
         startTime: now,
+        detail: detail,
     };
 
     new Notice(`▶️ タスク: ${taskFile.basename} の作業を開始しました (${formatTime(now)})`);
@@ -330,8 +390,9 @@ export async function endWork(
 
     // Build the log line
     let logLine = `- ${startTimeStr}-${endTimeStr} [[${activeWork.taskName}]]`;
-    if (memo) {
-        logLine += ` / ${memo}`;
+    const notes = [activeWork.detail, memo].filter(Boolean).join(" / ");
+    if (notes) {
+        logLine += ` / ${notes}`;
     }
 
     // Get or create today's daily note
